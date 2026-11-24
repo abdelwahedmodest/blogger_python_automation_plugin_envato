@@ -1,0 +1,14 @@
+
+# Environnement virtuel
+aienv/
+
+# Fichiers sensibles / locaux
+.env
+credentials.json
+token.json
+*.swp
+
+# Cache Python / système
+__pycache__/
+*.pyc
+.DS_Store

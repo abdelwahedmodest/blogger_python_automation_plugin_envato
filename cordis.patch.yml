@@ -1,0 +1,151 @@
+﻿- id: ui-chat
+  name: "@deepseek-ai/dsh-client-ui-chat"
+  config:
+    transcriptView: standard
+    performanceUsage: detailed
+- id: ui-settings
+  name: "@deepseek-ai/dsh-client-ui-settings"
+  config:
+    enabled: true
+- id: ui-settings-account
+  name: "@deepseek-ai/dsh-client-ui-settings-account"
+  config:
+    version: 1
+    step: done
+    usage: detailed
+    developerTools: true
+    purpose: null
+    process: standard
+    completion: api-key
+
+# --- MCP servers: REA (carried over unchanged) + Blogger ---
+- insert:
+    - id: rea-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: rea
+        transport: stdio
+        command: cmd.exe
+        args:
+          - /d
+          - /c
+          - npx
+          - -y
+          - rea-agents@6.8.0
+          - mcp
+
+    - id: mcp-blogger
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: blogger
+        transport: stdio
+        command: node
+        args:
+          - 'C:\Users\lenovo\AppData\Roaming\npm\node_modules\blogger-mcp-server-fixed\dist\index.js'
+        env:
+          BLOGGER_API_KEY: !!js "process.env.BLOGGER_API_KEY"
+          BLOGGER_ID: "2493166214402069743"
+          GOOGLE_CLIENT_ID: !!js "process.env.GOOGLE_CLIENT_ID"
+          GOOGLE_CLIENT_SECRET: !!js "process.env.GOOGLE_CLIENT_SECRET"
+          GOOGLE_REFRESH_TOKEN: !!js "process.env.GOOGLE_REFRESH_TOKEN"
+        toolCallTimeoutMs: 120000
+
+    - id: mcp-meta
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: meta
+        transport: stdio
+        command: node
+        args:
+          - 'C:\Users\lenovo\mcp-servers\meta-mcp-server\dist\index.js'
+        env:
+          META_ACCESS_TOKEN: !!js "process.env.META_ACCESS_TOKEN"
+        toolCallTimeoutMs: 120000
+
+# --- Zapier MCP (hosted streamable-HTTP server, Bearer token from ZAPIER_MCP_TOKEN) ---
+# The token itself never lives here: it is read at activation from the process
+# environment, which the Harness populates from ~/.dsh/.env at boot.
+- insert:
+    - id: mcp-zapier
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: zapier
+        transport: streamable-http
+        url: https://mcp.zapier.com/api/v1/connect
+        headers:
+          Authorization: !!js "'Bearer ' + process.env.ZAPIER_MCP_TOKEN"
+        toolCallTimeoutMs: 120000
+        maxInstructionBytes: 1048576
+        # Ne bloque jamais le dÃ©marrage du harnais si Zapier est indisponible :
+        # les outils apparaissent dÃ¨s que la reconnexion aboutit.
+        failOnStartupError: false
+        # Reconnexion persistante : backoff exponentiel plafonnÃ© Ã  30 s,
+        # 10 tentatives consÃ©cutives par panne, puis abandon silencieux.
+        reconnect:
+          enabled: true
+          initialDelayMs: 1000
+          maxDelayMs: 30000
+          maxAttempts: 10
+
+# `dsh-zapier-mcp` (installed profile bundle) mounts a second client for the very
+# same Zapier server under the same `zapier` namespace; disable its row so only
+# `mcp-zapier` above owns the `mcp__zapier__*` tool names. Flip to false to go
+# back to the bundle + its Settings page.
+- id: zapier-mcp
+  name: dsh-zapier-mcp
+  disabled: true
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      free-openrouter:
+        displayName: OPENFREEROUTER
+        apiKeyEnv: FREE_OPENROUTER_API_KEY
+        api: openai-completions
+        baseURL: https://openrouter.ai/api/v1
+        models:
+          - id: openrouter/free
+            name: Free Models Router
+            contextWindow: 200000
+          - id: "@preset/free-model"
+            name: free  models
+          - id: google/gemma-4-26b-a4b-it:free
+            name: geminiat
+      google:
+        apiKeyEnv: GOOGLE_API_KEY
+        api: google-generative-ai
+        baseURL: https://generativelanguage.googleapis.com/v1beta/openai
+        models:
+          - id: gemini-3.8-flash
+            name: Gemini 3.8 Flash
+            contextWindow: 1048576
+            maxTokens: 65536
+            input:
+              - text
+              - image
+        retryPolicy:
+          mode: always
+      orcarouter:
+        displayName: myorcarouter
+        apiKeyEnv: ORCAROUTER_API_KEY
+        api: openai-responses
+        baseURL: https://api.orcarouter.ai/v1
+        models:
+          - id: deepseek/deepseek-v4-flash-free
+            name: "DeepSeek: DeepSeek V4 Flash (Free)"
+- id: llm-deepseek
+  name: "@deepseek-ai/dsh-llm-deepseek-api-key"
+  disabled: true
+  config:
+    models: []
+- id: web-search-deepseek
+  name: "@deepseek-ai/dsh-web-search-deepseek"
+  config:
+    apiKeyEnv: DEEPSEEK_API_KEY
+    baseURL: https://api.deepseek.com/anthropic/v1
+    maxUses: 10
+- id: agent-default-model
+  name: "@deepseek-ai/dsh-agent-default-model"
+  config:
+    provider: google
+    model: gemini-3.8-flash
